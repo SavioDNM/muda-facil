@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  TRIAL
+  PRO
+}
+
+enum MudancaStatus {
+  RASCUNHO
+  COTANDO
+  CONFIRMADA
+  CONCLUIDA
+  CANCELADA
+}
+
+enum CategoriaItem {
+  QUARTO
+  COZINHA
+  SALA
+  ESCRITORIO
+  BANHEIRO
+  CAIXAS
+  OUTROS
+}
+
+model User {
+  id                     String    @id @default(cuid())
+  name                   String?
+  email                  String    @unique
+  emailVerified          DateTime?
+  image                  String?
+  plan                   Plan      @default(FREE)
+  stripeCustomerId       String?   @unique
+  stripePriceId          String?
+  stripeSubscriptionId   String?   @unique
+  stripeCurrentPeriodEnd DateTime?
+  trialEndsAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  accounts  Account[]
+  sessions  Session[]
+  mudancas  Mudanca[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Item {
+  id              String        @id @default(cuid())
+  nome            String
+  categoria       CategoriaItem
+  iconeUrl        String?
+  larguraCm       Float
+  alturaCm        Float
+  profundidadeCm  Float
+  pesoKg          Float
+  volumeM3        Float
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Caminhao {
+  id              String   @id @default(cuid())
+  nome            String
+  tipo            String
+  capacidadeM3    Float
+  capacidadeKg    Float
+  comprimentoCm   Float
+  larguraCm       Float
+  alturaCm        Float
+  imagemUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  mudancas        Mudanca[]
+  cargaLayouts    CargaLayout[]
+  cotacoes        Cotacao[]
+}
+
+model Transportadora {
+  id               String   @id @default(cuid())
+  nome             String
+  logoUrl          String?
+  notaMedia        Float    @default(0)
+  totalAvaliacoes  Int      @default(0)
+  cidade           String
+  tiposCaminhao    String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  cotacoes         Cotacao[]
+}
+
+model Mudanca {
+  id              String         @id @default(cuid())
+  userId          String
+  enderecoOrigem  String
+  enderecoDestino String
+  dataDesejada    DateTime?
+  itens           Json           @default("[]")
+  caminhaoId      String?
+  status          MudancaStatus  @default(RASCUNHO)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  caminhao        Caminhao?      @relation(fields: [caminhaoId], references: [id])
+  cotacoes        Cotacao[]
+  cargaLayouts    CargaLayout[]
+}
+
+model Cotacao {
+  id                String        @id @default(cuid())
+  mudancaId         String
+  transportadoraId  String
+  caminhaoId        String
+  precoCentavos     Int
+  dataDisponivel    DateTime
+  seguroIncluso     Boolean       @default(false)
+  validade          DateTime
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  mudanca           Mudanca       @relation(fields: [mudancaId], references: [id], onDelete: Cascade)
+  transportadora    Transportadora @relation(fields: [transportadoraId], references: [id])
+  caminhao          Caminhao      @relation(fields: [caminhaoId], references: [id])
+}
+
+model CargaLayout {
+  id                   String   @id @default(cuid())
+  mudancaId            String
+  caminhaoId           String
+  itensPosicionados    Json     @default("[]")
+  ocupacaoPercentual   Float    @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  mudanca              Mudanca  @relation(fields: [mudancaId], references: [id], onDelete: Cascade)
+  caminhao             Caminhao @relation(fields: [caminhaoId], references: [id])
+}
